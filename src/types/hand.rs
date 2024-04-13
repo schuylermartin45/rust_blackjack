@@ -80,23 +80,24 @@ impl Hand {
         HandValue { lo_sum, hi_sum }
     }
 
-    /// Deals a card to the hand, with a bet
-    pub fn hit(&mut self, deck: &mut Deck, bet: isize) {
+    /// Inspect the number of credits a player has.
+    pub fn get_credits(&self) -> isize {
+        self.credits
+    }
+
+    /// Deals a card to the hand.
+    pub fn hit(&mut self, deck: &mut Deck) {
         let card = deck.deal();
         match card {
             None => panic!("Deck ran out of cards!"),
             Some(c) => self.cards.push(c),
         };
-        // TODO handle betting
-        if bet == NO_BET_VALUE {
-            return;
-        }
     }
 
-    pub fn stay(&self) {}
-
-    pub fn double_down(&self, card: Card) -> usize {
-        0
+    /// A double down is a single hit that doubles the bet. Returns the new bet.
+    pub fn double_down(&mut self, deck: &mut Deck, bet: isize) -> isize {
+        self.hit(deck);
+        2 * bet
     }
 }
 
@@ -117,7 +118,8 @@ impl fmt::Display for Hand {
                 Ok(())
             }
             _ => {
-                writeln!(f, "{} ({}):", self.name, self.value()).expect("I/O Error");
+                writeln!(f, "{} ({}) | ${}", self.name, self.value(), self.credits)
+                    .expect("I/O Error");
                 for card in self.cards.iter() {
                     writeln!(f, "  {}", card).expect("I/O Error");
                 }
