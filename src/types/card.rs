@@ -98,7 +98,22 @@ impl Rank {
 
 impl fmt::Display for Rank {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", Rank::value(self))
+        let str = match *self {
+            Rank::Two
+            | Rank::Three
+            | Rank::Four
+            | Rank::Five
+            | Rank::Six
+            | Rank::Seven
+            | Rank::Eight
+            | Rank::Nine
+            | Rank::Ten => self.value().to_string(),
+            Rank::Jack => String::from("Jack"),
+            Rank::Queen => String::from("Queen"),
+            Rank::King => String::from("King"),
+            Rank::Ace => String::from("Ace"),
+        };
+        write!(f, "{}", str)
     }
 }
 
