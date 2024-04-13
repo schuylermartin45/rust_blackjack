@@ -45,6 +45,29 @@ fn bet_menu(cur_bet: isize, cur_credits: isize) -> isize {
     }
 }
 
+/// Menu to continue or stop the game. Quits program if the user says no.
+fn play_again_menu(human_credits: isize) {
+    loop {
+        print!("Play again? (Y)es | (N)o > ",);
+        let _ = io::stdout().flush();
+
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read user input");
+
+        // Quit the game from this sub-menu or set the old bet as the current.
+        match input.trim().to_lowercase().as_str() {
+            "y" | "yes" => return,
+            "n" | "no" | "q" | "quit" => {
+                println!("Cashed out: ${}", human_credits);
+                process::exit(0);
+            }
+            _ => (),
+        }
+    }
+}
+
 /// Runs a single player text-based game or runs a parallelized simulation.
 fn main() {
     // TODO: Parse CLI args to spin up a game or simulation
@@ -69,44 +92,14 @@ fn main() {
         // TODO add a game cntr when replays are added
         println!("\n---------- Game # ----------\n");
 
-        // Player action loop
-        loop {
-            println!("{}", dealer);
-            println!("{}", human);
+        human.play(&mut deck, cur_bet, Some(&dealer));
+        dealer.play(&mut deck, NO_BET_VALUE, None);
 
-            // End early if user ran out of money
-            if human.get_credits() <= 0 {
-                println!("You're out of money! Good say, sir!");
-                return;
-            }
+        // TODO determine winner
 
-            let mut action = String::new();
-
-            // TODO: conditionally show double down based on total and if there's enough credits.
-            print!(
-                "Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ",
-                cur_bet
-            );
-            let _ = io::stdout().flush();
-            io::stdin()
-                .read_line(&mut action)
-                .expect("Failed to read user input");
-
-            match action.trim().to_lowercase().as_str() {
-                "h" | "hit" => human.hit(&mut deck),
-                // TODO optionally enable
-                "d" | "double" | "double down" | "neil breen" => {
-                    // TODO Fix: Double down carries over to next round
-                    cur_bet = human.double_down(&mut deck, cur_bet);
-                    break;
-                }
-                "s" | "stay" | "stand" => break,
-                "q" | "quit" => return,
-                _ => continue,
-            }
-        }
-        // TODO wrap-up game on stay with dealer logic
-
-        // TODO play again?
+        play_again_menu(human.get_credits());
+        // If we've gotten to this point, the user has NOT quit, so we must
+        // reset for the next round.
+        // TODO clean-up for next round
     }
 }

@@ -3,7 +3,8 @@
 //! Description:    Describes a hand of cards (either a dealer or player)
 //!
 
-use std::{fmt, usize};
+use std::io::{self, Write};
+use std::{fmt, process, usize};
 
 use crate::types::card::{Card, Rank, MAX_BLACKJACK};
 use crate::types::deck::Deck;
@@ -98,6 +99,63 @@ impl Hand {
     pub fn double_down(&mut self, deck: &mut Deck, bet: isize) -> isize {
         self.hit(deck);
         2 * bet
+    }
+
+    /// Dealer simulation
+    fn play_dealer(&mut self, deck: &mut Deck) -> isize {
+        NO_BET_VALUE
+    }
+
+    /// Perfect use of the probability table simulation
+    fn play_probability_table(&mut self, deck: &mut Deck, bet: isize) -> isize {
+        0
+    }
+
+    /// UI for human playable games. Returns the bet placed.
+    fn play_human(&mut self, deck: &mut Deck, bet: isize, dealer: &Hand) -> isize {
+        // Player action loop
+        loop {
+            println!("{}", dealer);
+            println!("{}", self);
+
+            // End early if user ran out of money
+            if self.get_credits() <= 0 {
+                println!("You're out of money! Good say, sir!");
+                return bet;
+            }
+
+            let mut action = String::new();
+
+            // TODO: conditionally show double down based on total and if there's enough credits.
+            print!("Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ", bet);
+            let _ = io::stdout().flush();
+            io::stdin()
+                .read_line(&mut action)
+                .expect("Failed to read user input");
+
+            match action.trim().to_lowercase().as_str() {
+                "h" | "hit" => self.hit(deck),
+                // TODO optionally enable
+                "d" | "double" | "double down" | "neil breen" => {
+                    return self.double_down(deck, bet);
+                }
+                "s" | "stay" | "stand" => return bet,
+                "q" | "quit" => process::exit(0),
+                _ => continue,
+            }
+        }
+    }
+
+    /// Executes play mode based on strategy. Returns the final score
+    pub fn play(&mut self, deck: &mut Deck, bet: isize, dealer: Option<&Hand>) -> isize {
+        match self.strategy {
+            Strategy::Dealer => self.play_dealer(deck),
+            Strategy::ProbabilityTable => self.play_probability_table(deck, bet),
+            Strategy::Human => match dealer {
+                Some(d) => self.play_human(deck, bet, d),
+                _ => panic!("Dealer was not provided for display!"),
+            },
+        }
     }
 }
 
