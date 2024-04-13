@@ -78,6 +78,7 @@ fn main() {
 
     let mut cur_bet: isize = DEFAULT_BET_VALUE;
 
+    let mut game_cntr = 1000;
     loop {
         // Deal initial cards
         for _ in 0..2 {
@@ -88,8 +89,7 @@ fn main() {
         // Bet must occur before cards are shown
         cur_bet = bet_menu(cur_bet, human.get_credits());
 
-        // TODO add a game cntr when replays are added
-        println!("\n---------- Game # ----------\n");
+        println!("\n---------- Game #{:<4} ----------\n", game_cntr);
 
         human.play(&mut deck, cur_bet, Some(&dealer));
         dealer.play(&mut deck, NO_BET_VALUE, None);
@@ -102,5 +102,6 @@ fn main() {
         deck = Deck::new();
         human.clear_hand();
         dealer.clear_hand();
+        game_cntr += 1;
     }
 }
