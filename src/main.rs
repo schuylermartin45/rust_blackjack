@@ -7,7 +7,7 @@ use std::process;
 
 use crate::types::deck::Deck;
 use crate::types::hand::{
-    Hand, Strategy, DEALER_INFINITE_CREDITS, HUMAN_DEFAULT_CREDITS, NO_BET_VALUE,
+    Hand, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS, NO_BET_VALUE,
 };
 
 pub mod types;
@@ -48,7 +48,7 @@ fn bet_menu(cur_bet: isize, cur_credits: isize) -> isize {
 /// Menu to continue or stop the game. Quits program if the user says no.
 fn play_again_menu(human_credits: isize) {
     loop {
-        print!("Play again? (Y)es | (N)o > ",);
+        print!("Credits: ${} | Play again? (Y)es | (N)o > ", human_credits);
         let _ = io::stdout().flush();
 
         let mut input = String::new();
@@ -76,16 +76,15 @@ fn main() {
     let mut dealer = Hand::new("Dealer", Strategy::Dealer, DEALER_INFINITE_CREDITS);
     let mut human = Hand::new("Player 1", Strategy::Human, HUMAN_DEFAULT_CREDITS);
 
-    let mut players = Vec::from([&mut human, &mut dealer]);
+    let mut cur_bet: isize = DEFAULT_BET_VALUE;
 
-    for _ in 0..2 {
-        for player in players.iter_mut() {
-            player.hit(&mut deck)
-        }
-    }
-
-    let mut cur_bet: isize = 1;
     loop {
+        // Deal initial cards
+        for _ in 0..2 {
+            human.hit(&mut deck);
+            dealer.hit(&mut deck);
+        }
+
         // Bet must occur before cards are shown
         cur_bet = bet_menu(cur_bet, human.get_credits());
 
@@ -100,6 +99,8 @@ fn main() {
         play_again_menu(human.get_credits());
         // If we've gotten to this point, the user has NOT quit, so we must
         // reset for the next round.
-        // TODO clean-up for next round
+        deck = Deck::new();
+        human.clear_hand();
+        dealer.clear_hand();
     }
 }

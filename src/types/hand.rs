@@ -13,8 +13,12 @@ use crate::types::deck::Deck;
 pub const DEALER_INFINITE_CREDITS: isize = -1;
 /// Default number of credits a human starts with
 pub const HUMAN_DEFAULT_CREDITS: isize = 100;
+/// Default bet size
+pub const DEFAULT_BET_VALUE: isize = 1;
 /// Used for the dealer who does not "bet" and to initialize hands.
 pub const NO_BET_VALUE: isize = 0;
+/// The maximum number of cards one could have before going bust.
+pub const MAX_HAND_CARD_COUNT: usize = 11;
 
 /// Describes how
 pub enum Strategy {
@@ -50,7 +54,7 @@ impl Hand {
     pub fn new(name: &str, strategy: Strategy, credits: isize) -> Self {
         let hand = Hand {
             name: String::from(name),
-            cards: Vec::new(),
+            cards: Vec::with_capacity(MAX_HAND_CARD_COUNT),
             strategy: strategy,
             credits: credits,
         };
@@ -99,6 +103,11 @@ impl Hand {
     pub fn double_down(&mut self, deck: &mut Deck, bet: isize) -> isize {
         self.hit(deck);
         2 * bet
+    }
+
+    /// Clears the hand the player currently has. Does not reset credits or other state.
+    pub fn clear_hand(&mut self) {
+        self.cards.clear();
     }
 
     /// Dealer simulation
