@@ -29,7 +29,7 @@ pub enum Strategy {
     ProbabilityTable,
 }
 
-/// Describes the final result of a round.
+/// Describes the final result of a round (from the player's perspective).
 pub enum Outcome {
     Win,
     Loss,
@@ -73,6 +73,34 @@ impl Hand {
         hand
     }
 
+    /// Determines the outcome of a game based on the player's hand and the dealer's hand.
+    pub fn determine_outcome(player: &Hand, dealer: &Hand) -> Outcome {
+        let player_val = player.final_value();
+        let dealer_val = dealer.final_value();
+
+        // If the player busts, the dealer automatically wins.
+        if player_val > MAX_BLACKJACK {
+            return Outcome::Loss;
+        }
+        // If the dealer busts and you don't (checked above), you win
+        if dealer_val > MAX_BLACKJACK {
+            return Outcome::Win;
+        }
+        // If there's a tie, it's a "push"
+        if player_val == dealer_val {
+            return Outcome::Push;
+        }
+
+        // The closest to BlackJack has the lowest diff. The diff must be positive at this point
+        // as we have already checked for bust scenarios.
+        let player_diff = MAX_BLACKJACK - player_val;
+        let dealer_diff = MAX_BLACKJACK - dealer_val;
+        if player_diff > dealer_diff {
+            return Outcome::Loss;
+        }
+        Outcome::Win
+    }
+
     /// Returns the value of the hand as a tuple of options.
     /// The first value is the "low" sum, all Aces as 1.
     /// The second value is the "high sum", with 1 Ace as 11.
@@ -95,6 +123,15 @@ impl Hand {
         }
 
         HandValue { lo_sum, hi_sum }
+    }
+
+    /// Returns the "final" value of the hand when the round is complete.
+    pub fn final_value(&self) -> usize {
+        let val = self.value();
+        if val.hi_sum < MAX_BLACKJACK {
+            return val.hi_sum;
+        }
+        val.lo_sum
     }
 
     /// Inspect the number of credits a player has.

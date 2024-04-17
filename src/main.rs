@@ -92,10 +92,10 @@ fn main() {
         cur_bet = bet_menu(cur_bet, human.get_credits());
         human.sub_credits(cur_bet);
 
-        println!("\n---------- Game #{:<4} ----------\n", game_cntr);
+        println!("\n########## Game #{:<4} ##########\n", game_cntr);
 
         // Final bet is used in betting calculations as it accounts for a player doubling down.
-        let mut final_bet = cur_bet;
+        let final_bet;
         loop {
             println!("{}", dealer);
             println!("{}", human);
@@ -105,24 +105,30 @@ fn main() {
                 break;
             }
         }
+        println!("+++++ Dealer's Turn +++++");
         loop {
             thread::sleep(time::Duration::from_secs(1));
             dealer.show_hand();
             println!("{}", dealer);
-            println!("{}", human);
             let (stop, _) = dealer.play_once(&mut deck, NO_BET_VALUE);
             if stop {
                 break;
             }
         }
+        // Reprint the human's hand at the end to visualize the final result.
+        println!("{}", human);
 
-        // TODO determine winner
-        let outcome = Outcome::Push;
-
-        match outcome {
-            Outcome::Win => human.add_credits(final_bet * 2),
-            Outcome::Loss => (),
-            Outcome::Push => human.add_credits(final_bet),
+        // Determine the outcome and adjust the player's credits.
+        match Hand::determine_outcome(&human, &dealer) {
+            Outcome::Win => {
+                human.add_credits(final_bet * 2);
+                println!("----- Winner! -----");
+            }
+            Outcome::Loss => println!("----- Loser!  -----"),
+            Outcome::Push => {
+                human.add_credits(final_bet);
+                println!("-----  Push.  -----");
+            }
         }
 
         play_again_menu(human.get_credits());
