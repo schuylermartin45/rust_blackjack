@@ -3,11 +3,12 @@
 //! Description:    CLI interface for this project
 //!
 use std::io::{self, Write};
-use std::process;
+use std::{process, thread, time};
 
 use crate::types::deck::Deck;
 use crate::types::hand::{
-    Hand, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS, NO_BET_VALUE,
+    Hand, Outcome, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS,
+    NO_BET_VALUE,
 };
 
 pub mod types;
@@ -76,9 +77,10 @@ fn main() {
     let mut dealer = Hand::new("Dealer", Strategy::Dealer, DEALER_INFINITE_CREDITS);
     let mut human = Hand::new("Player 1", Strategy::Human, HUMAN_DEFAULT_CREDITS);
 
+    // Current bet tracks bets between games for easier user interaction.
     let mut cur_bet: isize = DEFAULT_BET_VALUE;
 
-    let mut game_cntr = 1000;
+    let mut game_cntr = 1;
     loop {
         // Deal initial cards
         for _ in 0..2 {
@@ -88,13 +90,40 @@ fn main() {
 
         // Bet must occur before cards are shown
         cur_bet = bet_menu(cur_bet, human.get_credits());
+        human.sub_credits(cur_bet);
 
         println!("\n---------- Game #{:<4} ----------\n", game_cntr);
 
-        human.play(&mut deck, cur_bet, Some(&dealer));
-        dealer.play(&mut deck, NO_BET_VALUE, None);
+        // Final bet is used in betting calculations as it accounts for a player doubling down.
+        let mut final_bet = cur_bet;
+        loop {
+            println!("{}", dealer);
+            println!("{}", human);
+            let (stop, new_bet) = human.play_once(&mut deck, cur_bet);
+            if stop {
+                final_bet = new_bet;
+                break;
+            }
+        }
+        loop {
+            thread::sleep(time::Duration::from_secs(1));
+            dealer.show_hand();
+            println!("{}", dealer);
+            println!("{}", human);
+            let (stop, _) = dealer.play_once(&mut deck, NO_BET_VALUE);
+            if stop {
+                break;
+            }
+        }
 
         // TODO determine winner
+        let outcome = Outcome::Push;
+
+        match outcome {
+            Outcome::Win => human.add_credits(final_bet * 2),
+            Outcome::Loss => (),
+            Outcome::Push => human.add_credits(final_bet),
+        }
 
         play_again_menu(human.get_credits());
         // If we've gotten to this point, the user has NOT quit, so we must

@@ -17,14 +17,23 @@ pub const HUMAN_DEFAULT_CREDITS: isize = 100;
 pub const DEFAULT_BET_VALUE: isize = 1;
 /// Used for the dealer who does not "bet" and to initialize hands.
 pub const NO_BET_VALUE: isize = 0;
+/// Dealer's do not deal to themselves past this value
+pub const DEALER_HAND_THRESHOLD: usize = 17;
 /// The maximum number of cards one could have before going bust.
 pub const MAX_HAND_CARD_COUNT: usize = 11;
 
-/// Describes how
+/// Describes the player role/strategy
 pub enum Strategy {
     Dealer,
     Human,
     ProbabilityTable,
+}
+
+/// Describes the final result of a round.
+pub enum Outcome {
+    Win,
+    Loss,
+    Push, // Tie
 }
 
 /// Describes the value of a hand (handles Ace value options)
@@ -48,6 +57,8 @@ pub struct Hand {
     strategy: Strategy,
     /// Bets should not go negative. Dealers have "infinite" credits.
     credits: isize,
+    /// Flag used by the dealer to render the face-down card.
+    show_dealer_hand: bool,
 }
 impl Hand {
     /// Constructs a hand with the first two dealt cards.
@@ -57,6 +68,7 @@ impl Hand {
             cards: Vec::with_capacity(MAX_HAND_CARD_COUNT),
             strategy: strategy,
             credits: credits,
+            show_dealer_hand: false,
         };
         hand
     }
@@ -90,6 +102,16 @@ impl Hand {
         self.credits
     }
 
+    /// Adds credits for the user.
+    pub fn add_credits(&mut self, to_add: isize) {
+        self.credits += to_add;
+    }
+
+    /// Subtracts credits from the user.
+    pub fn sub_credits(&mut self, to_sub: isize) {
+        self.credits -= to_sub;
+    }
+
     /// Deals a card to the hand.
     pub fn hit(&mut self, deck: &mut Deck) {
         let card = deck.deal();
@@ -101,69 +123,80 @@ impl Hand {
 
     /// A double down is a single hit that doubles the bet. Returns the new bet.
     pub fn double_down(&mut self, deck: &mut Deck, bet: isize) -> isize {
+        self.sub_credits(bet);
         self.hit(deck);
         2 * bet
+    }
+
+    /// Shows the dealer's full hand when rendered.
+    pub fn show_hand(&mut self) {
+        self.show_dealer_hand = true;
     }
 
     /// Clears the hand the player currently has. Does not reset credits or other state.
     pub fn clear_hand(&mut self) {
         self.cards.clear();
+        // Reset the dealer's rendering flag
+        self.show_dealer_hand = false;
     }
 
-    /// Dealer simulation
-    fn play_dealer(&mut self, deck: &mut Deck) -> isize {
-        NO_BET_VALUE
-    }
-
-    /// Perfect use of the probability table simulation
-    fn play_probability_table(&mut self, deck: &mut Deck, bet: isize) -> isize {
-        0
-    }
-
-    /// UI for human playable games. Returns the bet placed.
-    fn play_human(&mut self, deck: &mut Deck, bet: isize, dealer: &Hand) -> isize {
-        // Player action loop
-        loop {
-            println!("{}", dealer);
-            println!("{}", self);
-
-            // End early if user ran out of money
-            if self.get_credits() <= 0 {
-                println!("You're out of money! Good say, sir!");
-                return bet;
-            }
-
-            let mut action = String::new();
-
-            // TODO: conditionally show double down based on total and if there's enough credits.
-            print!("Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ", bet);
-            let _ = io::stdout().flush();
-            io::stdin()
-                .read_line(&mut action)
-                .expect("Failed to read user input");
-
-            match action.trim().to_lowercase().as_str() {
-                "h" | "hit" => self.hit(deck),
-                // TODO optionally enable
-                "d" | "double" | "double down" | "neil breen" => {
-                    return self.double_down(deck, bet);
-                }
-                "s" | "stay" | "stand" => return bet,
-                "q" | "quit" => process::exit(0),
-                _ => continue,
-            }
+    /// Dealer simulation. Returns true if the dealer stops.
+    fn play_dealer(&mut self, deck: &mut Deck) -> bool {
+        // Optionally print game moves. Add some delay for human readability.
+        let hand_val = self.value();
+        // Dealer met the threshold, bust, or got BlackJack
+        if hand_val.lo_sum >= DEALER_HAND_THRESHOLD {
+            return true;
         }
+        // Dealer met the threshold by counting the 1st Ace as 11 without busting.
+        if hand_val.hi_sum < MAX_BLACKJACK && hand_val.hi_sum >= DEALER_HAND_THRESHOLD {
+            return true;
+        }
+        self.hit(deck);
+        false
     }
 
-    /// Executes play mode based on strategy. Returns the final score
-    pub fn play(&mut self, deck: &mut Deck, bet: isize, dealer: Option<&Hand>) -> isize {
+    /// Perfect use of the probability table simulation. Returns true if the player quit.
+    fn play_probability_table(&mut self, deck: &mut Deck, bet: isize) -> (bool, isize) {
+        (true, bet)
+    }
+
+    /// UI for human playable games. Returns true if the player quit.
+    fn play_human(&mut self, deck: &mut Deck, bet: isize) -> (bool, isize) {
+        // End early if user ran out of money
+        if self.get_credits() <= 0 {
+            println!("You're out of money! Good say, sir!");
+            return (true, bet);
+        }
+
+        let mut action = String::new();
+
+        // TODO: conditionally show double down based on total and if there's enough credits.
+        print!("Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ", bet);
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut action)
+            .expect("Failed to read user input");
+
+        match action.trim().to_lowercase().as_str() {
+            "h" | "hit" => self.hit(deck),
+            // TODO optionally enable
+            "d" | "double" | "double down" | "neil breen" => {
+                return (true, self.double_down(deck, bet));
+            }
+            "s" | "stay" | "stand" => return (true, bet),
+            "q" | "quit" => process::exit(0),
+            _ => (),
+        }
+        (false, bet)
+    }
+
+    /// Executes 1 play action based on strategy. Returns true if the player stops.
+    pub fn play_once(&mut self, deck: &mut Deck, bet: isize) -> (bool, isize) {
         match self.strategy {
-            Strategy::Dealer => self.play_dealer(deck),
+            Strategy::Dealer => (self.play_dealer(deck), NO_BET_VALUE),
             Strategy::ProbabilityTable => self.play_probability_table(deck, bet),
-            Strategy::Human => match dealer {
-                Some(d) => self.play_human(deck, bet, d),
-                _ => panic!("Dealer was not provided for display!"),
-            },
+            Strategy::Human => self.play_human(deck, bet),
         }
     }
 }
@@ -171,8 +204,8 @@ impl Hand {
 impl fmt::Display for Hand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.strategy {
-            // TODO handle the final reveal.
-            Strategy::Dealer => {
+            // TODO: There's probably a better way than to use a flag
+            Strategy::Dealer if !self.show_dealer_hand => {
                 writeln!(f, "{}", self.name).expect("I/O Error");
                 for (i, card) in self.cards.iter().enumerate() {
                     // The second card is the "down" card.
