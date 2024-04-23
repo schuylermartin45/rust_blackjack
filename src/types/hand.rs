@@ -241,7 +241,6 @@ impl Hand {
 impl fmt::Display for Hand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.strategy {
-            // TODO: There's probably a better way than to use a flag
             Strategy::Dealer if !self.show_dealer_hand => {
                 writeln!(f, "{}", self.name).expect("I/O Error");
                 for (i, card) in self.cards.iter().enumerate() {

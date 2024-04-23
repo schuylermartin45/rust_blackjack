@@ -5,6 +5,8 @@
 use std::io::{self, Write};
 use std::{process, thread, time};
 
+use clap::Parser;
+
 use crate::types::deck::Deck;
 use crate::types::hand::{
     Hand, Outcome, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS,
@@ -12,6 +14,16 @@ use crate::types::hand::{
 };
 
 pub mod types;
+
+#[derive(Parser)]
+#[command(version, about, long_about = "A virtual BlackJack text-based game and simulator with betting.")]
+struct CliArgs {
+    /// Number of simulations to run. A negative value will start a human-playable game.
+    #[arg(default_value_t=-1)]
+    runs: isize,
+}
+
+
 
 /// Runs an interactive sub-menu for controlling bets. Checks against the current credit count.
 fn bet_menu(cur_bet: isize, cur_credits: isize) -> isize {
@@ -71,7 +83,11 @@ fn play_again_menu(human_credits: isize) {
 
 /// Runs a single player text-based game or runs a parallelized simulation.
 fn main() {
-    // TODO: Parse CLI args to spin up a game or simulation
+    let args = CliArgs::parse();
+
+    if args.runs > 0 {
+        // TODO run n simulations in parallel.
+    }
 
     let mut deck = Deck::new();
     let mut dealer = Hand::new("Dealer", Strategy::Dealer, DEALER_INFINITE_CREDITS);
