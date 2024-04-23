@@ -3,6 +3,7 @@
 //! Description:    Describes a card
 //!
 
+use rstest::rstest;
 use std::fmt;
 use std::slice::Iter;
 
@@ -128,4 +129,14 @@ impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} of {}", self.rank, self.suit)
     }
+}
+
+/// Validates card serialization
+#[rstest]
+#[case(Card{suit: Suit::Spades, rank: Rank::Ace}, "Ace of Spades")]
+#[case(Card{suit: Suit::Hearts, rank: Rank::Ten}, "10 of Hearts")]
+#[case(Card{suit: Suit::Diamonds, rank: Rank::Two}, "2 of Diamonds")]
+#[case(Card{suit: Suit::Clubs, rank: Rank::Jack}, "Jack of Clubs")]
+fn display_cards(#[case] card: Card, #[case] expected: &str) {
+    assert_eq!(card.to_string(), expected)
 }

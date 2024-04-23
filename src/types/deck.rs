@@ -5,6 +5,7 @@
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use rstest::{fixture, rstest};
 use std::fmt;
 
 use crate::types::card::Card;
@@ -54,4 +55,25 @@ impl fmt::Display for Deck {
         }
         Ok(())
     }
+}
+
+#[fixture]
+pub fn deck_fixture() -> Deck {
+    Deck::new()
+}
+
+/// Validates that the deck decreases in size when cards are dealt.
+#[rstest]
+fn display_cards(mut deck_fixture: Deck) {
+    deck_fixture.deal();
+    assert_eq!(deck_fixture.cards.len(), 51)
+}
+
+/// Dealing past the size of the deck should return `None`
+#[rstest]
+fn deal_empty_deck(mut deck_fixture: Deck) {
+    for _ in 0..52 {
+        assert!(deck_fixture.deal().is_some());
+    }
+    assert!(deck_fixture.deal().is_none());
 }
