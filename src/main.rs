@@ -16,14 +16,16 @@ use crate::types::hand::{
 pub mod types;
 
 #[derive(Parser)]
-#[command(version, about, long_about = "A virtual BlackJack text-based game and simulator with betting.")]
+#[command(
+    version,
+    about,
+    long_about = "A virtual BlackJack text-based game and simulator with betting."
+)]
 struct CliArgs {
     /// Number of simulations to run. A negative value will start a human-playable game.
     #[arg(default_value_t=-1)]
     runs: isize,
 }
-
-
 
 /// Runs an interactive sub-menu for controlling bets. Checks against the current credit count.
 fn bet_menu(cur_bet: isize, cur_credits: isize) -> isize {

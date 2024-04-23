@@ -22,6 +22,11 @@ pub const DEALER_HAND_THRESHOLD: usize = 17;
 /// The maximum number of cards one could have before going bust.
 pub const MAX_HAND_CARD_COUNT: usize = 11;
 
+/// Minimum value allowed for doubling down (virtual BlackJack rules)
+pub const DD_MIN: usize = 9;
+/// Maximum value allowed for doubling down (virtual BlackJack rules)
+pub const DD_MAX: usize = 11;
+
 /// Describes the player role/strategy
 pub enum Strategy {
     Dealer,
@@ -43,7 +48,8 @@ pub struct HandValue {
 }
 impl fmt::Display for HandValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.lo_sum == self.hi_sum {
+        // Don't show the split score if it is redundant or the upper bound is a bust.
+        if self.lo_sum == self.hi_sum || self.hi_sum > MAX_BLACKJACK {
             return write!(f, "{}", self.lo_sum);
         }
         write!(f, "{}/{}", self.lo_sum, self.hi_sum)
@@ -128,7 +134,7 @@ impl Hand {
     /// Returns the "final" value of the hand when the round is complete.
     pub fn final_value(&self) -> usize {
         let val = self.value();
-        if val.hi_sum < MAX_BLACKJACK {
+        if val.hi_sum <= MAX_BLACKJACK {
             return val.hi_sum;
         }
         val.lo_sum
@@ -156,6 +162,18 @@ impl Hand {
             None => panic!("Deck ran out of cards!"),
             Some(c) => self.cards.push(c),
         };
+    }
+
+    /// Returns true if doubling down is currently allowed
+    pub fn can_double_down(&self, bet: isize) -> bool {
+        // You can't double down if you don't have sufficient credits
+        if self.credits < bet {
+            return false;
+        }
+        // The exact rules aren't publicized and probably aren't consistent from BlackJack machine to machine or casino
+        // to casino.
+        let val = self.value().lo_sum;
+        val >= DD_MIN && val <= DD_MAX
     }
 
     /// A double down is a single hit that doubles the bet. Returns the new bet.
@@ -205,11 +223,27 @@ impl Hand {
             println!("You're out of money! Good say, sir!");
             return (true, bet);
         }
+        // Auto-terminates on BlackJack and bust
+        {
+            let cur_val = self.value();
+            if cur_val.lo_sum == MAX_BLACKJACK || cur_val.hi_sum == MAX_BLACKJACK {
+                println!("BlackJack!");
+                return (true, bet);
+            }
+            if cur_val.lo_sum > MAX_BLACKJACK {
+                println!("Bust!");
+                return (true, bet);
+            }
+        }
 
         let mut action = String::new();
 
-        // TODO: conditionally show double down based on total and if there's enough credits.
-        print!("Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ", bet);
+        // Conditionally enable double down based on total and if there's enough credits.
+        if self.can_double_down(bet) {
+            print!("Bet: ${} | (H)it | (D)ouble Down | (S)tay | (Q)uit > ", bet);
+        } else {
+            print!("Bet: ${} | (H)it | (S)tay | (Q)uit > ", bet);
+        }
         let _ = io::stdout().flush();
         io::stdin()
             .read_line(&mut action)
@@ -217,8 +251,8 @@ impl Hand {
 
         match action.trim().to_lowercase().as_str() {
             "h" | "hit" => self.hit(deck),
-            // TODO optionally enable
-            "d" | "double" | "double down" | "neil breen" => {
+            "d" | "double" | "double down" | "neil breen" if self.can_double_down(bet) => {
+                println!("Double down! (Neil would be proud)");
                 return (true, self.double_down(deck, bet));
             }
             "s" | "stay" | "stand" => return (true, bet),
