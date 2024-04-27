@@ -3,10 +3,11 @@
 //! Description:    Describes a hand of cards (either a dealer or player)
 //!
 
+use rstest::rstest;
 use std::io::{self, Write};
 use std::{fmt, process, usize};
 
-use crate::types::card::{Card, Rank, MAX_BLACKJACK};
+use crate::types::card::{Card, Rank, Suit, MAX_BLACKJACK};
 use crate::types::deck::Deck;
 
 /// Represents the dealer's "infinite" money pile
@@ -28,6 +29,7 @@ pub const DD_MIN: usize = 9;
 pub const DD_MAX: usize = 11;
 
 /// Describes the player role/strategy
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Strategy {
     Dealer,
     Human,
@@ -35,6 +37,7 @@ pub enum Strategy {
 }
 
 /// Describes the final result of a round (from the player's perspective).
+#[derive(Debug, Eq, PartialEq)]
 pub enum Outcome {
     Win,
     Loss,
@@ -57,6 +60,7 @@ impl fmt::Display for HandValue {
 }
 
 /// Describes a player or dealer's hand
+#[derive(Clone)]
 pub struct Hand {
     name: String,
     cards: Vec<Card>,
@@ -74,6 +78,18 @@ impl Hand {
             cards: Vec::with_capacity(MAX_HAND_CARD_COUNT),
             strategy: strategy,
             credits: credits,
+            show_dealer_hand: false,
+        };
+        hand
+    }
+
+    /// Constructs a Hand from a list of cards. Used in unit testing.
+    pub fn from_vector(name: &str, strategy: Strategy, vector: Vec<Card>) -> Self {
+        let hand = Hand {
+            name: String::from(name),
+            cards: vector,
+            strategy: strategy,
+            credits: HUMAN_DEFAULT_CREDITS,
             show_dealer_hand: false,
         };
         hand
@@ -297,4 +313,81 @@ impl fmt::Display for Hand {
             }
         }
     }
+}
+
+/// Basic game simulator that validates expected outcomes of hands that could be dealt.
+#[rstest]
+// Basic win/loss scenarios
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Eight}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::Seven}],
+    Outcome::Win
+)]
+#[case(
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::Seven}],
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Eight}],
+    Outcome::Loss
+)]
+// Push scenarios
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::King}],
+    Outcome::Push
+)]
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Ace}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::Ace}],
+    Outcome::Push
+)]
+// 21 with a sum of multiple cards
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Six}, Card{suit: Suit::Clubs, rank: Rank::Five}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}],
+    Outcome::Win
+)]
+#[case(
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}],
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Six}, Card{suit: Suit::Clubs, rank: Rank::Five}],
+    Outcome::Loss
+)]
+// 21 with an Ace
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Ace}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}],
+    Outcome::Win
+)]
+#[case(
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}],
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Ace}],
+    Outcome::Loss
+)]
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Ace}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::Ace}],
+    Outcome::Push
+)]
+// Bust scenarios
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Three}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}, Card{suit: Suit::Diamonds, rank: Rank::Two}],
+    Outcome::Win
+)]
+#[case(
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}, Card{suit: Suit::Diamonds, rank: Rank::Two}],
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::Three}],
+    Outcome::Loss
+)]
+#[case(
+    vec![Card{suit: Suit::Clubs, rank: Rank::Jack}, Card{suit: Suit::Clubs, rank: Rank::King}, Card{suit: Suit::Clubs, rank: Rank::Two}],
+    vec![Card{suit: Suit::Diamonds, rank: Rank::Jack}, Card{suit: Suit::Diamonds, rank: Rank::King}, Card{suit: Suit::Diamonds, rank: Rank::Two}],
+    Outcome::Loss
+)]
+fn check_outcome(
+    #[case] player_cards: Vec<Card>,
+    #[case] dealer_cards: Vec<Card>,
+    #[case] expected: Outcome,
+) {
+    let player = Hand::from_vector("player", Strategy::ProbabilityTable, player_cards);
+    let dealer = Hand::from_vector("dealer", Strategy::Dealer, dealer_cards);
+    assert_eq!(Hand::determine_outcome(&player, &dealer), expected)
 }
