@@ -39,7 +39,7 @@ impl fmt::Display for Suit {
 }
 
 /// Enumeration representing the "value" of a card
-#[derive(Clone, Copy)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Rank {
     Two,
     Three,

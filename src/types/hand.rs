@@ -2,11 +2,11 @@
 //! File:           hand.rs
 //! Description:    Describes a hand of cards (either a dealer or player)
 //!
-
 use rstest::rstest;
 use std::io::{self, Write};
 use std::{fmt, process, usize};
 
+use crate::data::probability_table::{get_action, Action};
 use crate::types::card::{Card, Rank, Suit, MAX_BLACKJACK};
 use crate::types::deck::Deck;
 
@@ -22,6 +22,11 @@ pub const NO_BET_VALUE: isize = 0;
 pub const DEALER_HAND_THRESHOLD: usize = 17;
 /// The maximum number of cards one could have before going bust.
 pub const MAX_HAND_CARD_COUNT: usize = 11;
+
+/// The dealer's first card is the down card
+pub const DOWN_CARD_IDX: usize = 0;
+/// The dealer's second card is the up card.
+pub const UP_CARD_IDX: usize = 1;
 
 /// Minimum value allowed for doubling down (virtual BlackJack rules)
 pub const DD_MIN: usize = 9;
@@ -199,6 +204,14 @@ impl Hand {
         2 * bet
     }
 
+    /// Returns the rank of the up card. Can only be used on the dealer.
+    pub fn get_up_card_rank(&self) -> Rank {
+        if self.strategy != Strategy::Dealer {
+            panic!("There is no `up-card` for non-dealer players.")
+        }
+        self.cards[UP_CARD_IDX].rank
+    }
+
     /// Shows the dealer's full hand when rendered.
     pub fn show_hand(&mut self) {
         self.show_dealer_hand = true;
@@ -228,8 +241,24 @@ impl Hand {
     }
 
     /// Perfect use of the probability table simulation. Returns true if the player quit.
-    fn play_probability_table(&mut self, deck: &mut Deck, bet: isize) -> (bool, isize) {
-        (true, bet)
+    fn play_probability_table(
+        &mut self,
+        deck: &mut Deck,
+        bet: isize,
+        up_card: Rank,
+    ) -> (bool, isize) {
+        match get_action(self.final_value(), up_card) {
+            Action::Hit => self.hit(deck),
+            Action::DoubleDown => {
+                // Can't double down if there are insufficient funds
+                if self.can_double_down(bet) {
+                    return (true, self.double_down(deck, bet));
+                }
+                self.hit(deck)
+            }
+            Action::Stand => return (true, bet),
+        }
+        (false, bet)
     }
 
     /// UI for human playable games. Returns true if the player quit.
@@ -279,10 +308,10 @@ impl Hand {
     }
 
     /// Executes 1 play action based on strategy. Returns true if the player stops.
-    pub fn play_once(&mut self, deck: &mut Deck, bet: isize) -> (bool, isize) {
+    pub fn play_once(&mut self, deck: &mut Deck, bet: isize, up_card: Rank) -> (bool, isize) {
         match self.strategy {
             Strategy::Dealer => (self.play_dealer(deck), NO_BET_VALUE),
-            Strategy::ProbabilityTable => self.play_probability_table(deck, bet),
+            Strategy::ProbabilityTable => self.play_probability_table(deck, bet, up_card),
             Strategy::Human => self.play_human(deck, bet),
         }
     }
@@ -294,8 +323,7 @@ impl fmt::Display for Hand {
             Strategy::Dealer if !self.show_dealer_hand => {
                 writeln!(f, "{}", self.name).expect("I/O Error");
                 for (i, card) in self.cards.iter().enumerate() {
-                    // The second card is the "down" card.
-                    if i == 1 {
+                    if i == DOWN_CARD_IDX {
                         writeln!(f, "  <DOWN CARD>").expect("I/O Error");
                         continue;
                     }

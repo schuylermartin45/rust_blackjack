@@ -13,6 +13,7 @@ use crate::types::hand::{
     NO_BET_VALUE,
 };
 
+pub mod data;
 pub mod types;
 
 #[derive(Parser)]
@@ -89,6 +90,8 @@ fn main() {
 
     if args.runs > 0 {
         // TODO run n simulations in parallel.
+        eprintln!("Not yet implemented!");
+        process::exit(1);
     }
 
     let mut deck = Deck::new();
@@ -117,7 +120,7 @@ fn main() {
         loop {
             println!("{}", dealer);
             println!("{}", human);
-            let (stop, new_bet) = human.play_once(&mut deck, cur_bet);
+            let (stop, new_bet) = human.play_once(&mut deck, cur_bet, dealer.get_up_card_rank());
             if stop {
                 final_bet = new_bet;
                 break;
@@ -128,7 +131,7 @@ fn main() {
             thread::sleep(time::Duration::from_secs(1));
             dealer.show_hand();
             println!("{}", dealer);
-            let (stop, _) = dealer.play_once(&mut deck, NO_BET_VALUE);
+            let (stop, _) = dealer.play_once(&mut deck, NO_BET_VALUE, dealer.get_up_card_rank());
             if stop {
                 break;
             }
