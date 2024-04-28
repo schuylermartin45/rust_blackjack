@@ -16,6 +16,8 @@ use crate::types::hand::{
 pub mod data;
 pub mod types;
 
+const DEFAULT_MAX_GAMES_PER_RUN: usize = 50;
+
 #[derive(Parser)]
 #[command(
     version,
@@ -99,14 +101,74 @@ fn reset_game(player: &mut Hand, dealer: &mut Hand) -> Deck {
     Deck::new()
 }
 
+/// Plays a game with the dealer at most `max_games` number of times. Bails early if the player runs out of money.
+/// This simulates a single "session" of a player sitting down to play a game.
+/// TODO: Add Monte Carlo and other betting strats
+/// TODO: Add support for a physical game by re-using the Deck to some degree.
+fn run_automated_match(max_games: usize) {
+    let mut deck = Deck::new();
+    let mut dealer = Hand::new("Dealer", Strategy::Dealer, DEALER_INFINITE_CREDITS);
+    let mut player = Hand::new(
+        "Auto Player",
+        Strategy::ProbabilityTable,
+        HUMAN_DEFAULT_CREDITS,
+    );
+
+    for _ in 0..max_games {
+        init_game(&mut player, &mut dealer, &mut deck);
+
+        let bet = DEFAULT_BET_VALUE;
+        player.sub_credits(bet);
+
+        // Player control
+        let final_bet: isize;
+        loop {
+            let (stop, new_bet) = player.play_once(&mut deck, bet, dealer.get_up_card_rank());
+            if stop {
+                final_bet = new_bet;
+                break;
+            }
+        }
+
+        // Dealer control
+        loop {
+            let (stop, _) = dealer.play_once(&mut deck, NO_BET_VALUE, dealer.get_up_card_rank());
+            if stop {
+                break;
+            }
+        }
+
+        match Hand::determine_outcome(&player, &dealer) {
+            Outcome::Win => {
+                player.add_credits(final_bet * 2);
+            }
+            Outcome::Loss => (),
+            Outcome::Push => {
+                player.add_credits(final_bet);
+            }
+        }
+
+        // Broke players can't play
+        if player.get_credits() <= 0 {
+            break;
+        }
+
+        // According to the internet, digital Blackjack machines reset the deck every game instance.
+        deck = reset_game(&mut player, &mut dealer);
+    }
+    // TODO return some final stats
+}
+
 /// Runs a single player text-based game or runs a parallelized simulation.
 fn main() {
     let args = CliArgs::parse();
 
     if args.runs > 0 {
         // TODO run n simulations in parallel.
-        eprintln!("Not yet implemented!");
-        process::exit(1);
+        for _ in 0..args.runs {
+            run_automated_match(DEFAULT_MAX_GAMES_PER_RUN);
+        }
+        process::exit(0);
     }
 
     let mut deck = Deck::new();
