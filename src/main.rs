@@ -84,6 +84,21 @@ fn play_again_menu(human_credits: isize) {
     }
 }
 
+/// Initialize a game between a player and a dealer
+fn init_game(player: &mut Hand, dealer: &mut Hand, deck: &mut Deck) {
+    for _ in 0..2 {
+        player.hit(deck);
+        dealer.hit(deck);
+    }
+}
+
+/// Resets a game, providing a new deck of cards to work with
+fn reset_game(player: &mut Hand, dealer: &mut Hand) -> Deck {
+    player.clear_hand();
+    dealer.clear_hand();
+    Deck::new()
+}
+
 /// Runs a single player text-based game or runs a parallelized simulation.
 fn main() {
     let args = CliArgs::parse();
@@ -104,10 +119,7 @@ fn main() {
     let mut game_cntr = 1;
     loop {
         // Deal initial cards
-        for _ in 0..2 {
-            human.hit(&mut deck);
-            dealer.hit(&mut deck);
-        }
+        init_game(&mut human, &mut dealer, &mut deck);
 
         // Bet must occur before cards are shown
         cur_bet = bet_menu(cur_bet, human.get_credits());
@@ -155,9 +167,7 @@ fn main() {
         play_again_menu(human.get_credits());
         // If we've gotten to this point, the user has NOT quit, so we must
         // reset for the next round.
-        deck = Deck::new();
-        human.clear_hand();
-        dealer.clear_hand();
+        deck = reset_game(&mut human, &mut dealer);
         game_cntr += 1;
     }
 }
