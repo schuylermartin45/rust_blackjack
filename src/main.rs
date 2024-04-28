@@ -12,6 +12,7 @@ use crate::types::hand::{
     Hand, Outcome, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS,
     NO_BET_VALUE,
 };
+use crate::types::stats::RunStats;
 
 pub mod data;
 pub mod types;
@@ -105,7 +106,7 @@ fn reset_game(player: &mut Hand, dealer: &mut Hand) -> Deck {
 /// This simulates a single "session" of a player sitting down to play a game.
 /// TODO: Add Monte Carlo and other betting strats
 /// TODO: Add support for a physical game by re-using the Deck to some degree.
-fn run_automated_match(max_games: usize) {
+fn run_automated_match(max_games: usize) -> RunStats {
     let mut deck = Deck::new();
     let mut dealer = Hand::new("Dealer", Strategy::Dealer, DEALER_INFINITE_CREDITS);
     let mut player = Hand::new(
@@ -113,6 +114,8 @@ fn run_automated_match(max_games: usize) {
         Strategy::ProbabilityTable,
         HUMAN_DEFAULT_CREDITS,
     );
+
+    let mut stats = RunStats::new();
 
     for _ in 0..max_games {
         init_game(&mut player, &mut dealer, &mut deck);
@@ -138,7 +141,8 @@ fn run_automated_match(max_games: usize) {
             }
         }
 
-        match Hand::determine_outcome(&player, &dealer) {
+        let match_outcome = Hand::determine_outcome(&player, &dealer);
+        match match_outcome {
             Outcome::Win => {
                 player.add_credits(final_bet * 2);
             }
@@ -147,6 +151,7 @@ fn run_automated_match(max_games: usize) {
                 player.add_credits(final_bet);
             }
         }
+        stats.record_match_end(match_outcome);
 
         // Broke players can't play
         if player.get_credits() <= 0 {
@@ -156,7 +161,9 @@ fn run_automated_match(max_games: usize) {
         // According to the internet, digital Blackjack machines reset the deck every game instance.
         deck = reset_game(&mut player, &mut dealer);
     }
-    // TODO return some final stats
+
+    stats.record_credits(player.get_credits());
+    stats
 }
 
 /// Runs a single player text-based game or runs a parallelized simulation.
@@ -166,7 +173,7 @@ fn main() {
     if args.runs > 0 {
         // TODO run n simulations in parallel.
         for _ in 0..args.runs {
-            run_automated_match(DEFAULT_MAX_GAMES_PER_RUN);
+            println!("{}", run_automated_match(DEFAULT_MAX_GAMES_PER_RUN));
         }
         process::exit(0);
     }
