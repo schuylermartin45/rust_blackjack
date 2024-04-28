@@ -12,7 +12,7 @@ use crate::types::hand::{
     Hand, Outcome, Strategy, DEALER_INFINITE_CREDITS, DEFAULT_BET_VALUE, HUMAN_DEFAULT_CREDITS,
     NO_BET_VALUE,
 };
-use crate::types::stats::RunStats;
+use crate::types::stats::{RunStats, TotalRunStats};
 
 pub mod data;
 pub mod types;
@@ -172,9 +172,11 @@ fn main() {
 
     if args.runs > 0 {
         // TODO run n simulations in parallel.
+        let mut total_stats = TotalRunStats::new(HUMAN_DEFAULT_CREDITS);
         for _ in 0..args.runs {
-            println!("{}", run_automated_match(DEFAULT_MAX_GAMES_PER_RUN));
+            total_stats.add_run(run_automated_match(DEFAULT_MAX_GAMES_PER_RUN));
         }
+        println!("{}", total_stats);
         process::exit(0);
     }
 
