@@ -6,6 +6,7 @@ use std::io::{self, Write};
 use std::{process, thread, time};
 
 use clap::Parser;
+use rayon::prelude::*;
 
 use crate::types::deck::Deck;
 use crate::types::hand::{
@@ -171,10 +172,14 @@ fn main() {
     let args = CliArgs::parse();
 
     if args.runs > 0 {
-        // TODO run n simulations in parallel.
         let mut total_stats = TotalRunStats::new(HUMAN_DEFAULT_CREDITS);
-        for _ in 0..args.runs {
-            total_stats.add_run(run_automated_match(DEFAULT_MAX_GAMES_PER_RUN));
+        // Each game is run in a parallel using rayon's `map()` functionality.
+        let results: Vec<RunStats> = (0..args.runs)
+            .into_par_iter()
+            .map(|_| run_automated_match(DEFAULT_MAX_GAMES_PER_RUN))
+            .collect();
+        for stats in results {
+            total_stats.add_run(stats);
         }
         println!("{}", total_stats);
         process::exit(0);
